@@ -529,18 +529,18 @@ def train_seg(net, train_data=None, train_labels=None, train_files=None,
                 jaccard_epoch_sum_val /= len(rperm)
             lavg /= nsum
             jaccard_epoch_sum /= nsum
-            
-            train_logger.info(
-                f"{iepoch}, train_loss={lavg:.4f}, test_loss={lavgt:.4f}, LR={LR[iepoch]:.4f}, time {time.time()-t0:.2f}s"
-            )
-            lavg, nsum = 0, 0
-        
+
         jaccard_train.append(jaccard_epoch_sum)
         jaccard_val.append(jaccard_epoch_sum_val)
         epochs.append(iepoch)
         loss_val.append(lavgt)
         loss_train.append(lavg)
-        
+            
+        train_logger.info(
+            f"{iepoch}, train_loss={lavg:.4f}, test_loss={lavgt:.4f}, LR={LR[iepoch]:.4f}, time {time.time()-t0:.2f}s"
+        )
+        lavg, nsum = 0, 0
+         
         if iepoch > 0 and iepoch % save_every == 0:
             net.save_model(model_path)
     net.save_model(model_path)
