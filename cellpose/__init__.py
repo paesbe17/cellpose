@@ -1,1 +1,1 @@
-from cellpose.version import version, version_str
+from .version import version, version_str
