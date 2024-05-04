@@ -13,6 +13,17 @@ import logging
 
 train_logger = logging.getLogger(__name__)
 
+def jaccard_index(pred, target):
+    intersection = torch.logical_and(target, pred).sum().float()
+    union = torch.logical_or(target, pred).sum().float()
+    jaccard = intersection / union
+    return jaccard.item()  # Convertir el resultado a un número flotante
+
+
+def _jaccard_index(lbl, y, device):
+    jaccard = jaccard_index(y[:, -1], torch.from_numpy(lbl[:, 0] > 0.5).to(device).float())
+    return jaccard
+
 
 def _loss_fn_seg(lbl, y, device):
     """
@@ -439,6 +450,14 @@ def train_seg(net, train_data=None, train_labels=None, train_files=None,
 
     train_logger.info(f">>> saving model to {model_path}")
 
+    jaccard_train = []
+    jaccard_val = []
+    loss_train = []
+    loss_val = []
+    epochs = []
+    
+    jaccard_epoch_sum = 0
+    jaccard_epoch_sum_val = 0
     lavg, nsum = 0, 0
     for iepoch in range(n_epochs):
         np.random.seed(iepoch)
@@ -473,8 +492,11 @@ def train_seg(net, train_data=None, train_labels=None, train_files=None,
             train_loss *= len(imgi)
             lavg += train_loss
             nsum += len(imgi)
+
+            jaccard_epoch_sum += _jaccard_index(lbl, y, device)
+            
         
-        if iepoch == 5 or iepoch % 10 == 0:
+        if iepoch == 5 or iepoch % 1 == 0:
             lavgt = 0.
             if test_data is not None or test_files is not None:
                 np.random.seed(42)
@@ -502,18 +524,28 @@ def train_seg(net, train_data=None, train_labels=None, train_files=None,
                         test_loss = loss.item()
                         test_loss *= len(imgi)
                         lavgt += test_loss
+                        jaccard_epoch_sum_val += _jaccard_index(lbl, y, device)
                 lavgt /= len(rperm)
+                jaccard_epoch_sum_val /= len(rperm)
             lavg /= nsum
+            jaccard_epoch_sum /= nsum
+            
             train_logger.info(
                 f"{iepoch}, train_loss={lavg:.4f}, test_loss={lavgt:.4f}, LR={LR[iepoch]:.4f}, time {time.time()-t0:.2f}s"
             )
             lavg, nsum = 0, 0
-
+        
+        jaccard_train.append(jaccard_epoch_sum)
+        jaccard_val.append(jaccard_epoch_sum_val)
+        epochs.append(iepoch)
+        loss_val.append(lavgt)
+        loss_train.append(lavg)
+        
         if iepoch > 0 and iepoch % save_every == 0:
             net.save_model(model_path)
     net.save_model(model_path)
 
-    return model_path
+    return model_path, epochs, loss_train, loss_val, jaccard_train, jaccard_val
 
 def train_size(net, pretrained_model, train_data=None, train_labels=None,
                train_files=None, train_labels_files=None, train_probs=None,
