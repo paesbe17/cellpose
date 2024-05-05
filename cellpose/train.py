@@ -466,12 +466,12 @@ def train_seg(net, train_data=None, train_labels=None, train_files=None,
     loss_train = []
     loss_val = []
     epochs = []
-
-    intersection_sum_val = 0
-    intersection_sum, intersection_sum_val = 0, 0
-    union_sum, union_sum_val = 0, 0
     lavg, nsum = 0, 0
+    jaccard_epoch_avg = 0 
     for iepoch in range(n_epochs):
+        # Reinicia las variables para la suma de intersecciones en entrenamiento y validación en cada época
+        jaccard_epoch_sum = 0
+        jaccard_epoch_sum_val = 0
         np.random.seed(iepoch)
         if nimg != nimg_per_epoch:
             rperm = np.random.choice(np.arange(0, nimg), size=(nimg_per_epoch,),
@@ -506,8 +506,7 @@ def train_seg(net, train_data=None, train_labels=None, train_files=None,
             nsum += len(imgi)
 
             intersection, union = _jaccard_index(lbl, y, device)
-            intersection_sum += intersection
-            union_sum += union
+            jaccard_epoch_sum += intersection
                 
             
         
@@ -539,19 +538,19 @@ def train_seg(net, train_data=None, train_labels=None, train_files=None,
                         test_loss = loss.item()
                         test_loss *= len(imgi)
                         lavgt += test_loss
-                        # Calcula la intersección y unión para el índice de Jaccard
+                        # Llama a la función _jaccard_index para calcular la intersección y la unión en la validación
                         intersection, union = _jaccard_index(lbl, y, device)
-                        intersection_sum_val += intersection
-                        union_sum_val += union
+                        # Acumula la intersección para esta mini-época en validación
+                        jaccard_epoch_sum_val += intersection
                 lavgt /= len(rperm)
                 jaccard_epoch_sum_val /= len(rperm)
             lavg /= nsum
             jaccard_epoch_sum /= nsum
-        # Calcula el índice de Jaccard
-        jaccard_epoch_sum = intersection_sum / union_sum
-        jaccard_epoch_sum_val = intersection_sum_val / union_sum_val
+
+        # Calcula el índice de Jaccard promedio para esta época
+        jaccard_epoch_avg = jaccard_epoch_sum / (kend / batch_size)
     
-        jaccard_train.append(jaccard_epoch_sum)
+        jaccard_train.append(jaccard_epoch_avg)
         jaccard_val.append(jaccard_epoch_sum_val)
                 
         epochs.append(iepoch)
@@ -562,11 +561,6 @@ def train_seg(net, train_data=None, train_labels=None, train_files=None,
             f"{iepoch}, train_loss={lavg:.4f}, test_loss={lavgt:.4f}, LR={LR[iepoch]:.4f}, time {time.time()-t0:.2f}s"
         )
         lavg, nsum = 0, 0
-        # Reinicia las variables de la suma para la próxima época
-        intersection_sum = 0
-        union_sum = 0
-        intersection_sum_val = 0
-        union_sum_val = 0
 
         if iepoch > 0 and iepoch % save_every == 0:
             net.save_model(model_path)
