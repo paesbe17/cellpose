@@ -466,7 +466,8 @@ def train_seg(net, train_data=None, train_labels=None, train_files=None,
     loss_train = []
     loss_val = []
     epochs = []
-    
+
+    intersection_sum_val = 0
     intersection_sum = 0
     union_sum = 0
     lavg, nsum = 0, 0
