@@ -469,7 +469,7 @@ def train_seg(net, train_data=None, train_labels=None, train_files=None,
 
     intersection_sum_val = 0
     intersection_sum, intersection_sum_val = 0, 0
-    union_sum, union_sum_val = 0,0
+    union_sum, union_sum_val = 0, 0
     lavg, nsum = 0, 0
     for iepoch in range(n_epochs):
         np.random.seed(iepoch)
@@ -565,6 +565,8 @@ def train_seg(net, train_data=None, train_labels=None, train_files=None,
         # Reinicia las variables de la suma para la próxima época
         intersection_sum = 0
         union_sum = 0
+        intersection_sum_val = 0
+        union_sum_val = 0
 
         if iepoch > 0 and iepoch % save_every == 0:
             net.save_model(model_path)
