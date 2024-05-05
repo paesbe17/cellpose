@@ -466,12 +466,16 @@ def train_seg(net, train_data=None, train_labels=None, train_files=None,
     loss_train = []
     loss_val = []
     epochs = []
+                  
     lavg, nsum = 0, 0
-    jaccard_epoch_avg = 0 
+    jaccard_epoch_avg = 0
+    jaccard_epoch_avg_val = 0
     for iepoch in range(n_epochs):
         # Reinicia las variables para la suma de intersecciones en entrenamiento y validación en cada época
         jaccard_epoch_sum = 0
         jaccard_epoch_sum_val = 0
+        union_sum = 0
+        union_sum_val = 0
         np.random.seed(iepoch)
         if nimg != nimg_per_epoch:
             rperm = np.random.choice(np.arange(0, nimg), size=(nimg_per_epoch,),
@@ -507,8 +511,10 @@ def train_seg(net, train_data=None, train_labels=None, train_files=None,
 
             intersection, union = _jaccard_index(lbl, y, device)
             jaccard_epoch_sum += intersection
-                
+            union_sum += union
             
+        jaccard_epoch_avg = jaccard_epoch_sum / union_sum
+                
         
         if iepoch == 5 or iepoch % 1 == 0:
             lavgt = 0.
@@ -542,15 +548,12 @@ def train_seg(net, train_data=None, train_labels=None, train_files=None,
                         intersection, union = _jaccard_index(lbl, y, device)
                         # Acumula la intersección para esta mini-época en validación
                         jaccard_epoch_sum_val += intersection
+                        union_sum_val += union
                 lavgt /= len(rperm)
-                jaccard_epoch_sum_val /= len(rperm)
             lavg /= nsum
-            jaccard_epoch_sum /= nsum
-
-        # Calcula el índice de Jaccard promedio para esta época
-        jaccard_epoch_avg = jaccard_epoch_sum / (kend / batch_size)
-    
-        jaccard_train.append(jaccard_epoch_avg)
+        jaccard_epoch_avg_val = jaccard_epoch_sum / union_sum
+        
+        jaccard_train.append(jaccard_epoch_avg_val)
         jaccard_val.append(jaccard_epoch_sum_val)
                 
         epochs.append(iepoch)
