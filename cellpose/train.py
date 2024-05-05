@@ -13,16 +13,27 @@ import logging
 
 train_logger = logging.getLogger(__name__)
 
-def jaccard_index(pred, target):
-    intersection = torch.logical_and(target, pred).sum().float()
-    union = torch.logical_or(target, pred).sum().float()
-    jaccard = intersection / union
-    return jaccard.item()  # Convertir el resultado a un número flotante
-
-
 def _jaccard_index(lbl, y, device):
-    jaccard = jaccard_index(y[:, -1], torch.from_numpy(lbl[:, 0] > 0.5).to(device).float())
-    return jaccard
+    """
+    Calcula la intersección y la unión entre las máscaras binarias correspondientes al valor 'cellprob'.
+
+    Args:
+        lbl (numpy.ndarray): Etiquetas verdaderas (cellprob, flowsY, flowsX).
+        y (torch.Tensor): Valores predichos (flowsY, flowsX, cellprob).
+        device (torch.device): Dispositivo en el que se encuentran los tensores.
+
+    Returns:
+        tuple: Una tupla que contiene la intersección y la unión.
+    """
+    # Selecciona los valores 'cellprob' de y y lbl
+    y_cellprob = y[:, -1]
+    lbl_cellprob = torch.from_numpy(lbl[:, 0] > 0.5).to(device).float()
+
+    # Calcula la intersección y la unión
+    intersection = torch.logical_and(y_cellprob, lbl_cellprob).sum().item()
+    union = torch.logical_or(y_cellprob, lbl_cellprob).sum().item()
+
+    return intersection, union
 
 
 def _loss_fn_seg(lbl, y, device):
@@ -456,8 +467,8 @@ def train_seg(net, train_data=None, train_labels=None, train_files=None,
     loss_val = []
     epochs = []
     
-    jaccard_epoch_sum = 0
-    jaccard_epoch_sum_val = 0
+    intersection_sum = 0
+    union_sum = 0
     lavg, nsum = 0, 0
     for iepoch in range(n_epochs):
         np.random.seed(iepoch)
@@ -493,7 +504,10 @@ def train_seg(net, train_data=None, train_labels=None, train_files=None,
             lavg += train_loss
             nsum += len(imgi)
 
-            jaccard_epoch_sum += _jaccard_index(lbl, y, device)
+            intersection, union = _jaccard_index(lbl, y, device)
+            intersection_sum += intersection
+            union_sum += union
+                
             
         
         if iepoch == 5 or iepoch % 1 == 0:
@@ -524,14 +538,21 @@ def train_seg(net, train_data=None, train_labels=None, train_files=None,
                         test_loss = loss.item()
                         test_loss *= len(imgi)
                         lavgt += test_loss
-                        jaccard_epoch_sum_val += _jaccard_index(lbl, y, device)
+                        # Calcula la intersección y unión para el índice de Jaccard
+                        intersection, union = _jaccard_index(lbl, y, device)
+                        intersection_sum_val += intersection
+                        union_sum_val += union
                 lavgt /= len(rperm)
                 jaccard_epoch_sum_val /= len(rperm)
             lavg /= nsum
             jaccard_epoch_sum /= nsum
-
+        # Calcula el índice de Jaccard
+        jaccard_epoch_sum = intersection_sum / union_sum
+        jaccard_epoch_sum_val = intersection_sum_val / union_sum_val
+    
         jaccard_train.append(jaccard_epoch_sum)
         jaccard_val.append(jaccard_epoch_sum_val)
+                
         epochs.append(iepoch)
         loss_val.append(lavgt)
         loss_train.append(lavg)
@@ -540,7 +561,10 @@ def train_seg(net, train_data=None, train_labels=None, train_files=None,
             f"{iepoch}, train_loss={lavg:.4f}, test_loss={lavgt:.4f}, LR={LR[iepoch]:.4f}, time {time.time()-t0:.2f}s"
         )
         lavg, nsum = 0, 0
-         
+        # Reinicia las variables de la suma para la próxima época
+        intersection_sum = 0
+        union_sum = 0
+
         if iepoch > 0 and iepoch % save_every == 0:
             net.save_model(model_path)
     net.save_model(model_path)
