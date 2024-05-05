@@ -468,8 +468,8 @@ def train_seg(net, train_data=None, train_labels=None, train_files=None,
     epochs = []
 
     intersection_sum_val = 0
-    intersection_sum = 0
-    union_sum = 0
+    intersection_sum, intersection_sum_val = 0, 0
+    union_sum, union_sum_val = 0,0
     lavg, nsum = 0, 0
     for iepoch in range(n_epochs):
         np.random.seed(iepoch)
