@@ -9,12 +9,35 @@ from torch import nn
 from tqdm import trange
 from numba import prange
 import segmentation_models_pytorch as smp 
+from torch.optim import lr_scheduler
 
 import logging
 
 train_logger = logging.getLogger(__name__)
 
 Dice        = smp.losses.DiceLoss(mode='binary', from_logits=False)
+
+def fetch_scheduler(optimizer, name):
+    if name == 'CosineAnnealingLR':
+        scheduler = lr_scheduler.CosineAnnealingLR(optimizer,T_max=int(100*6*1.8), 
+                                                   eta_min=1e-6)
+    elif name == 'CosineAnnealingWarmRestarts':
+        scheduler = lr_scheduler.CosineAnnealingWarmRestarts(optimizer,T_0=25, 
+                                                             eta_min=1e-6)
+    elif name == 'ReduceLROnPlateau':
+        scheduler = lr_scheduler.ReduceLROnPlateau(optimizer,
+                                                   mode='min',
+                                                   factor=0.1,
+                                                   patience=7,
+                                                   threshold=0.0001,
+                                                   min_lr=1e-6,)
+    elif name == 'ExponentialLR':
+        scheduler = lr_scheduler.ExponentialLR(optimizer, gamma=0.85)
+    elif name == None:
+        return None
+        
+    return scheduler
+    
 
 def _loss_fn_seg(lbl, y, device):
     """
@@ -330,7 +353,7 @@ def train_seg(net, train_data=None, train_labels=None, train_files=None,
               compute_flows=False, save_path=None,
               save_every=100, nimg_per_epoch=None, nimg_test_per_epoch=None,
               rescale=True, scale_range=None, bsize=224,
-              min_train_masks=5, model_name=None):
+              min_train_masks=5, model_name=None, scheduler_type=None):
     """
     Train the network with images for segmentation.
 
@@ -433,6 +456,8 @@ def train_seg(net, train_data=None, train_labels=None, train_files=None,
         optimizer = torch.optim.SGD(net.parameters(), lr=learning_rate,
                                     weight_decay=weight_decay, momentum=momentum)
 
+    scheduler = fetch_scheduler(optimizer, scheduler_type)
+                  
     t0 = time.time()
     model_name = f"cellpose_{t0}" if model_name is None else model_name
     save_path = Path.cwd() if save_path is None else Path(save_path)
@@ -463,8 +488,8 @@ def train_seg(net, train_data=None, train_labels=None, train_files=None,
                                      p=train_probs)
         else:
             rperm = np.random.permutation(np.arange(0, nimg))
-        for param_group in optimizer.param_groups:
-            param_group["lr"] = LR[iepoch]
+        #for param_group in optimizer.param_groups:
+            #param_group["lr"] = LR[iepoch]
         net.train()
         for k in range(0, nimg_per_epoch, batch_size):
             kend = min(k + batch_size, nimg)
@@ -484,6 +509,8 @@ def train_seg(net, train_data=None, train_labels=None, train_files=None,
             optimizer.zero_grad()
             loss.backward()
             optimizer.step()
+            # Actualiza el scheduler
+            scheduler.step()
 
             train_loss = loss.item()
             train_loss *= len(imgi)
@@ -543,9 +570,9 @@ def train_seg(net, train_data=None, train_labels=None, train_files=None,
         epochs.append(iepoch)
         loss_val.append(lavgt)
         loss_train.append(lavg)
-            
+        
         train_logger.info(
-            f"{iepoch}, train_loss={lavg:.4f}, test_loss={lavgt:.4f}, LR={LR[iepoch]:.4f}, time {time.time()-t0:.2f}s")
+            f"{iepoch}, train_loss={lavg:.4f}, test_loss={lavgt:.4f}, LR={optimizer.param_groups[0]['lr']:.4f}, time {time.time()-t0:.2f}s")
         lavg, nsum = 0, 0
 
         if iepoch > 0 and iepoch % save_every == 0:
