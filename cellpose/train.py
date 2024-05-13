@@ -8,33 +8,13 @@ import torch
 from torch import nn
 from tqdm import trange
 from numba import prange
+import segmentation_models_pytorch as smp 
 
 import logging
 
 train_logger = logging.getLogger(__name__)
 
-def _jaccard_index(lbl, y, device):
-    """
-    Calcula la intersección y la unión entre las máscaras binarias correspondientes al valor 'cellprob'.
-
-    Args:
-        lbl (numpy.ndarray): Etiquetas verdaderas (cellprob, flowsY, flowsX).
-        y (torch.Tensor): Valores predichos (flowsY, flowsX, cellprob).
-        device (torch.device): Dispositivo en el que se encuentran los tensores.
-
-    Returns:
-        tuple: Una tupla que contiene la intersección y la unión.
-    """
-    # Selecciona los valores 'cellprob' de y y lbl
-    y_cellprob = y[:, -1]
-    lbl_cellprob = torch.from_numpy(lbl[:, 0] > 0.5).to(device).float()
-
-    # Calcula la intersección y la unión
-    intersection = torch.logical_and(y_cellprob, lbl_cellprob).sum().item()
-    union = torch.logical_or(y_cellprob, lbl_cellprob).sum().item()
-
-    return intersection, union
-
+Jaccard = smp.losses.JaccardLoss(mode='binary', from_logits=False)
 
 def _loss_fn_seg(lbl, y, device):
     """
@@ -468,14 +448,15 @@ def train_seg(net, train_data=None, train_labels=None, train_files=None,
     epochs = []
                   
     lavg, nsum = 0, 0
-    jaccard_epoch_avg = 0
-    jaccard_epoch_avg_val = 0
+                  
     for iepoch in range(n_epochs):
-        # Reinicia las variables para la suma de intersecciones en entrenamiento y validación en cada época
-        jaccard_epoch_sum = 0
-        jaccard_epoch_sum_val = 0
-        union_sum = 0
-        union_sum_val = 0
+        
+        # Reinicia las variables
+        TARGETS = []
+        PREDS   = []
+        TARGETS_val = []
+        PREDS_val   = []
+        
         np.random.seed(iepoch)
         if nimg != nimg_per_epoch:
             rperm = np.random.choice(np.arange(0, nimg), size=(nimg_per_epoch,),
@@ -508,14 +489,15 @@ def train_seg(net, train_data=None, train_labels=None, train_files=None,
             train_loss *= len(imgi)
             lavg += train_loss
             nsum += len(imgi)
-
-            intersection, union = _jaccard_index(lbl, y, device)
-            jaccard_epoch_sum += intersection
-            union_sum += union
             
-        jaccard_epoch_avg = jaccard_epoch_sum / union_sum
+            PREDS.append(y[:, -1])
+            TARGETS.append(torch.from_numpy(lbl[:, 0] > 0.5).to(device).float())
                 
         
+        TARGETS = torch.cat(TARGETS,dim=0).to(torch.float32)
+        PREDS   = (torch.cat(PREDS, dim=0)>0.5).to(torch.float32)
+        jaccard = 1. - Jaccard(TARGETS, PREDS).cpu().detach().numpy()
+
         if iepoch == 5 or iepoch % 1 == 0:
             lavgt = 0.
             if test_data is not None or test_files is not None:
@@ -544,25 +526,26 @@ def train_seg(net, train_data=None, train_labels=None, train_files=None,
                         test_loss = loss.item()
                         test_loss *= len(imgi)
                         lavgt += test_loss
-                        # Llama a la función _jaccard_index para calcular la intersección y la unión en la validación
-                        intersection, union = _jaccard_index(lbl, y, device)
-                        # Acumula la intersección para esta mini-época en validación
-                        jaccard_epoch_sum_val += intersection
-                        union_sum_val += union
+                        PREDS_val.append(y[:, -1])
+                        TARGETS_val.append(torch.from_numpy(lbl[:, 0] > 0.5).to(device).float())        
+        
+                TARGETS_val = torch.cat(TARGETS,dim=0).to(torch.float32)
+                PREDS_val   = (torch.cat(PREDS, dim=0)>0.5).to(torch.float32)
+                val_jaccard = 1. - Jaccard(TARGETS, PREDS).cpu().detach().numpy()
+        
                 lavgt /= len(rperm)
             lavg /= nsum
-        jaccard_epoch_avg_val = jaccard_epoch_sum / union_sum
+
         
-        jaccard_train.append(jaccard_epoch_avg_val)
-        jaccard_val.append(jaccard_epoch_sum_val)
+        jaccard_train.append(jaccard)
+        jaccard_val.append(val_jaccard)
                 
         epochs.append(iepoch)
         loss_val.append(lavgt)
         loss_train.append(lavg)
             
         train_logger.info(
-            f"{iepoch}, train_loss={lavg:.4f}, test_loss={lavgt:.4f}, LR={LR[iepoch]:.4f}, time {time.time()-t0:.2f}s"
-        )
+            f"{iepoch}, train_loss={lavg:.4f}, test_loss={lavgt:.4f}, LR={LR[iepoch]:.4f}, time {time.time()-t0:.2f}s")
         lavg, nsum = 0, 0
 
         if iepoch > 0 and iepoch % save_every == 0:
