@@ -529,9 +529,9 @@ def train_seg(net, train_data=None, train_labels=None, train_files=None,
                         PREDS_val.append(y[:, -1])
                         TARGETS_val.append(torch.from_numpy(lbl[:, 0] > 0.5).to(device).float())        
         
-                TARGETS_val = torch.cat(TARGETS,dim=0).to(torch.float32)
-                PREDS_val   = (torch.cat(PREDS, dim=0)>0.5).to(torch.float32)
-                val_jaccard = 1. - Jaccard(TARGETS, PREDS).cpu().detach().numpy()
+                TARGETS_val = torch.cat(TARGETS_val,dim=0).to(torch.float32)
+                PREDS_val   = (torch.cat(PREDS_val, dim=0)>0.5).to(torch.float32)
+                val_jaccard = 1. - Jaccard(TARGETS_val, PREDS_val).cpu().detach().numpy()
         
                 lavgt /= len(rperm)
             lavg /= nsum
