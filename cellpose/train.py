@@ -14,7 +14,7 @@ import logging
 
 train_logger = logging.getLogger(__name__)
 
-Jaccard = smp.losses.JaccardLoss(mode='binary', from_logits=False)
+Dice        = smp.losses.DiceLoss(mode='binary', from_logits=False)
 
 def _loss_fn_seg(lbl, y, device):
     """
@@ -441,8 +441,8 @@ def train_seg(net, train_data=None, train_labels=None, train_files=None,
 
     train_logger.info(f">>> saving model to {model_path}")
 
-    jaccard_train = []
-    jaccard_val = []
+    dice_train = []
+    dice_val = []
     loss_train = []
     loss_val = []
     epochs = []
@@ -496,7 +496,7 @@ def train_seg(net, train_data=None, train_labels=None, train_files=None,
         
         TARGETS = torch.cat(TARGETS,dim=0).to(torch.float32)
         PREDS   = (torch.cat(PREDS, dim=0)>0.5).to(torch.float32)
-        jaccard = 1. - Jaccard(TARGETS, PREDS).cpu().detach().numpy()
+        dice = 1. - Dice(TARGETS, PREDS).cpu().detach().numpy()
 
         if iepoch == 5 or iepoch % 1 == 0:
             lavgt = 0.
@@ -531,14 +531,14 @@ def train_seg(net, train_data=None, train_labels=None, train_files=None,
         
                 TARGETS_val = torch.cat(TARGETS_val,dim=0).to(torch.float32)
                 PREDS_val   = (torch.cat(PREDS_val, dim=0)>0.5).to(torch.float32)
-                val_jaccard = 1. - Jaccard(TARGETS_val, PREDS_val).cpu().detach().numpy()
+                val_dice = 1. - Dice(TARGETS_val, PREDS_val).cpu().detach().numpy()
         
                 lavgt /= len(rperm)
             lavg /= nsum
 
         
-        jaccard_train.append(jaccard)
-        jaccard_val.append(val_jaccard)
+        dice_train.append(dice)
+        dice_val.append(val_dice)
                 
         epochs.append(iepoch)
         loss_val.append(lavgt)
@@ -552,7 +552,7 @@ def train_seg(net, train_data=None, train_labels=None, train_files=None,
             net.save_model(model_path)
     net.save_model(model_path)
 
-    return model_path, epochs, loss_train, loss_val, jaccard_train, jaccard_val
+    return model_path, epochs, loss_train, loss_val, dice_train, dice_val
 
 def train_size(net, pretrained_model, train_data=None, train_labels=None,
                train_files=None, train_labels_files=None, train_probs=None,
