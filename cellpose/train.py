@@ -572,7 +572,7 @@ def train_seg(net, train_data=None, train_labels=None, train_files=None,
         loss_train.append(lavg)
         
         train_logger.info(
-            f"{iepoch}, train_loss={lavg:.4f}, test_loss={lavgt:.4f}, LR={optimizer.param_groups[0]['lr']:.4f}, time {time.time()-t0:.2f}s")
+            f"{iepoch}, train_loss={lavg:.4f}, test_loss={lavgt:.4f} #LR={optimizer.param_groups[0]['lr']:.4f}, time {time.time()-t0:.2f}s")
         lavg, nsum = 0, 0
 
         if iepoch > 0 and iepoch % save_every == 0:
