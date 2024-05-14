@@ -22,7 +22,7 @@ def fetch_scheduler(optimizer, name):
         scheduler = lr_scheduler.CosineAnnealingLR(optimizer,T_max=int(100*6*1.8), 
                                                    eta_min=1e-6)
     elif name == 'CosineAnnealingWarmRestarts':
-        scheduler = lr_scheduler.CosineAnnealingWarmRestarts(optimizer,T_0=25, 
+        scheduler = lr_scheduler.CosineAnnealingWarmRestarts(optimizer,T_0=50, 
                                                              eta_min=1e-6)
     elif name == 'ReduceLROnPlateau':
         scheduler = lr_scheduler.ReduceLROnPlateau(optimizer,
