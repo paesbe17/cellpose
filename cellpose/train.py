@@ -456,7 +456,7 @@ def train_seg(net, train_data=None, train_labels=None, train_files=None,
         optimizer = torch.optim.SGD(net.parameters(), lr=learning_rate,
                                     weight_decay=weight_decay, momentum=momentum)
 
-    scheduler = fetch_scheduler(optimizer, scheduler_type)
+    #scheduler = fetch_scheduler(optimizer, scheduler_type)
                   
     t0 = time.time()
     model_name = f"cellpose_{t0}" if model_name is None else model_name
@@ -488,10 +488,10 @@ def train_seg(net, train_data=None, train_labels=None, train_files=None,
                                      p=train_probs)
         else:
             rperm = np.random.permutation(np.arange(0, nimg))
-        #for param_group in optimizer.param_groups:
-            #param_group["lr"] = LR[iepoch]
+        for param_group in optimizer.param_groups:
+            param_group["lr"] = LR[iepoch]
         # Actualiza el programador de tasa de aprendizaje
-        scheduler.step()
+        # scheduler.step()
         
         net.train()
         
