@@ -488,9 +488,13 @@ def train_seg(net, train_data=None, train_labels=None, train_files=None,
                                      p=train_probs)
         else:
             rperm = np.random.permutation(np.arange(0, nimg))
-        for param_group in optimizer.param_groups:
-            param_group["lr"] = LR[iepoch]
+        #for param_group in optimizer.param_groups:
+            #param_group["lr"] = LR[iepoch]
+        # Actualiza el programador de tasa de aprendizaje
+        scheduler.step()
+        
         net.train()
+        
         for k in range(0, nimg_per_epoch, batch_size):
             kend = min(k + batch_size, nimg)
             inds = rperm[k:kend]
@@ -509,8 +513,6 @@ def train_seg(net, train_data=None, train_labels=None, train_files=None,
             optimizer.zero_grad()
             loss.backward()
             optimizer.step()
-            # Actualiza el scheduler
-            #scheduler.step()
 
             train_loss = loss.item()
             train_loss *= len(imgi)
