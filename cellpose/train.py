@@ -473,6 +473,14 @@ def train_seg(net, train_data=None, train_labels=None, train_files=None,
     epochs = []
                   
     lavg, nsum = 0, 0
+    
+    best_val_dice = 0.0  # Inicializamos con un valor bajo, ya que buscamos maximizar val_dice
+
+    best_epoch = -1
+    best_TARGETS_val = None
+    best_PREDS_val = None
+    best_TARGETS = None
+    best_PREDS = None
                   
     for iepoch in range(n_epochs):
         
@@ -574,6 +582,14 @@ def train_seg(net, train_data=None, train_labels=None, train_files=None,
         epochs.append(iepoch)
         loss_val.append(lavgt)
         loss_train.append(lavg)
+
+        # Cálculo de val_dice y otras métricas
+        if val_dice > best_val_dice:
+            best_val_dice = val_dice
+            best_TARGETS_val = TARGETS_val
+            best_PREDS_val = PREDS_val
+            best_TARGETS = TARGETS
+            best_PREDS = PREDS
         
         train_logger.info(
             f"{iepoch}, train_loss={lavg:.4f}, test_loss={lavgt:.4f} #LR={optimizer.param_groups[0]['lr']:.4f}, time {time.time()-t0:.2f}s")
@@ -582,8 +598,26 @@ def train_seg(net, train_data=None, train_labels=None, train_files=None,
         if iepoch > 0 and iepoch % save_every == 0:
             net.save_model(model_path)
     net.save_model(model_path)
+    
+    # Convertir los tensores a matrices NumPy
+    best_train_preds_np = best_PREDS.cpu().detach().numpy()
+    best_train_targets_np = best_TARGETS.cpu().detach().numpy()
+    best_valid_preds_np = best_PREDS_val.cpu().detach().numpy()
+    best_valid_targets_np = best_TARGETS_val.cpu().detach().numpy()
+                  
+    # Calcular la matriz de confusión
+    conf_mat_train = confusion_matrix(best_train_targets_np.flatten(), best_train_preds_np.flatten())
+    conf_mat_valid = confusion_matrix(best_valid_targets_np.flatten(), best_valid_preds_np.flatten())
+    
+    # Calcular la sensibilidad y precisión para entrenamiento
+    sensitivity_train = recall_score(best_train_targets_np.flatten(), best_train_preds_np.flatten(), average=None)
+    precision_train = precision_score(best_train_targets_np.flatten(), best_train_preds_np.flatten(), average=None)
 
-    return model_path, epochs, loss_train, loss_val, dice_train, dice_val
+    # Calcular la sensibilidad y precisión para validación
+    sensitivity_valid = recall_score(best_valid_targets_np.flatten(), best_valid_preds_np.flatten(), average=None)
+    precision_valid = precision_score(best_valid_targets_np.flatten(), best_valid_preds_np.flatten(), average=None)
+
+    return model_path, epochs, loss_train, loss_val, dice_train, dice_val, sensitivity_train, precision_train, sensitivity_valid, precision_valid
 
 def train_size(net, pretrained_model, train_data=None, train_labels=None,
                train_files=None, train_labels_files=None, train_probs=None,
