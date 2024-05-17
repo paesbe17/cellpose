@@ -10,6 +10,7 @@ from tqdm import trange
 from numba import prange
 import segmentation_models_pytorch as smp 
 from torch.optim import lr_scheduler
+from sklearn.metrics import confusion_matrix, precision_score, recall_score
 
 import logging
 
