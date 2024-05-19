@@ -499,10 +499,14 @@ def train_seg(net, train_data=None, train_labels=None, train_files=None,
             rperm = np.random.permutation(np.arange(0, nimg))
         #for param_group in optimizer.param_groups:
             #param_group["lr"] = LR[iepoch]
-        # Actualiza el programador de tasa de aprendizaje
-        #scheduler.step()
-        # Activar cuando el scheduler es ReduceLROnPlateau
-        scheduler.step(lavg)
+        
+        # Suponiendo que scheduler_type está definido previamente
+        if scheduler_type == 'ReduceLROnPlateau':
+            # Activar cuando el scheduler es ReduceLROnPlateau
+            scheduler.step(lavg)
+        else:
+            # Para otros tipos de scheduler
+            scheduler.step()
         
         net.train()
         
