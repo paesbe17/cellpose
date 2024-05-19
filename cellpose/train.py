@@ -500,9 +500,9 @@ def train_seg(net, train_data=None, train_labels=None, train_files=None,
         #for param_group in optimizer.param_groups:
             #param_group["lr"] = LR[iepoch]
         # Actualiza el programador de tasa de aprendizaje
-        scheduler.step()
+        #scheduler.step()
         # Activar cuando el scheduler es ReduceLROnPlateau
-        #scheduler.step(lavg)
+        scheduler.step(lavg)
         
         net.train()
         
